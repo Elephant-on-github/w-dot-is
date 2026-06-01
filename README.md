@@ -115,3 +115,7 @@ Each gets a tailored bio — athletes get their medals, cities get their populat
 ## License
 
 MIT — go nuts.
+
+## Disclaimer
+
+Built with [OpenCode](https://opencode.ai/)
