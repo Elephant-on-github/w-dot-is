@@ -34,15 +34,11 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          latest=$(git tag -l 'v*.*.*' | sed 's/^v//' | sort -V | tail -1)
-          if [ -z "$latest" ]; then
-            major=2
-          else
-            major=$(echo "$latest" | cut -d. -f1)
-            major=$((major + 1))
-          fi
-          echo "tag=v$major.0.0" >> $GITHUB_OUTPUT
-          echo "npm_ver=$major.0.0" >> $GITHUB_OUTPUT
+          published=$(npm view @elephant_dev/w.is version 2>/dev/null || echo "0.0.0")
+          major=$(echo "$published" | cut -d. -f1)
+          next=$((major + 1))
+          echo "tag=v$next.0.0" >> $GITHUB_OUTPUT
+          echo "npm_ver=$next.0.0" >> $GITHUB_OUTPUT
 
       - name: Update package.json version
         run: |
@@ -63,7 +59,7 @@ jobs:
           git tag ${{ steps.version.outputs.tag }}
 
       - name: Publish to npm
-        run: npm publish
+        run: npm publish --access public
 
       - name: Publish to GitHub Packages
         env:
