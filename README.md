@@ -1,8 +1,9 @@
 # w.is
 
-**What is, who is, where is — `w.is` and it shows you.**
+**What is, who is, where is — `w.is`**
 
-[![npm version](https://img.shields.io/npm/v/@elephant_dev/w.is?color=%23cb3837&logo=npm)](https://www.npmjs.com/package/@elephant_dev/w.is)
+[![w.is](https://img.shields.io/npm/v/@elephant_dev/w.is?style=for-the-badge&logo=npm&label=w.is)](https://www.npmjs.com/package/@elephant_dev/w.is)
+[![downloads](https://img.shields.io/npm/dm/@elephant_dev/w.is?style=for-the-badge&label=downloads)](https://www.npmjs.com/package/@elephant_dev/w.is)
 
 Ask it anything. It'll draw a picture and tell you a story.
 
