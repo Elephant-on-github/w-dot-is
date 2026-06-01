@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
@@ -31,16 +31,15 @@ jobs:
       - name: Determine next version
         id: version
         run: |
-          latest=$(git tag -l 'v*' | sed 's/^v0*//' | sort -n | tail -1)
+          latest=$(git tag -l 'v*.*.*' | sed 's/^v//' | sort -V | tail -1)
           if [ -z "$latest" ]; then
-            next=1
+            major=2
           else
-            next=$((latest + 1))
+            major=$(echo "$latest" | cut -d. -f1)
+            major=$((major + 1))
           fi
-          tag=$(printf "v%03d" $next)
-          npm_ver="0.0.$next"
-          echo "tag=$tag" >> $GITHUB_OUTPUT
-          echo "npm_ver=$npm_ver" >> $GITHUB_OUTPUT
+          echo "tag=v$major.0.0" >> $GITHUB_OUTPUT
+          echo "npm_ver=$major.0.0" >> $GITHUB_OUTPUT
 
       - name: Update package.json version
         run: |
