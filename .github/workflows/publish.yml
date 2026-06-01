@@ -5,6 +5,9 @@ on:
     types: [published]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -12,8 +15,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       - run: bun install --frozen-lockfile
 
@@ -21,5 +22,9 @@ jobs:
 
       - run: bun run build
 
-      - run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+      - name: Authenticate with npm
+        run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - run: bun publish
