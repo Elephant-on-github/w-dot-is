@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { verifyClaim } from '../src/verify';
+import { verifyClaim } from '../../src/verify';
 
 describe('verifyClaim', () => {
   it('returns true for "banana is a fruit"', async () => {

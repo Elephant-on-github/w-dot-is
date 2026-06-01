@@ -25,6 +25,9 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: Type check
+        run: bun run typecheck
+
       - name: Run unit tests
         run: bun test tests/ascii.test.ts tests/bio.test.ts tests/cli.test.ts
 

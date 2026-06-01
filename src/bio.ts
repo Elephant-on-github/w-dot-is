@@ -27,7 +27,7 @@ function detectCategory(summary: PageSummary, categories: string[]): EntityCateg
 function extractYear(text: string, label: string): string | null {
   const regex = new RegExp(`${label}\\s*(?::\\s*)?([^.<>\\n]+)`, 'i');
   const match = text.match(regex);
-  return match ? match[1]?.trim() : null;
+  return match ? (match[1]?.trim() ?? null) : null;
 }
 
 function extractLifespan(description?: string): string | null {

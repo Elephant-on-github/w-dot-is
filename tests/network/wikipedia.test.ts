@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { getPageCategories, getPageSummary, resolveEntity, searchWiki } from '../src/wikipedia';
+import { getPageCategories, getPageSummary, resolveEntity, searchWiki } from '../../src/wikipedia';
 
 describe('searchWiki', () => {
   it('finds a page for banana', async () => {
@@ -26,7 +26,7 @@ describe('getPageCategories', () => {
   it('returns categories for banana', async () => {
     const result = await getPageCategories('Banana');
     expect(result.length).toBeGreaterThan(0);
-    expect(result.some((c) => c.toLowerCase().includes('bananas'))).toBe(true);
+    expect(result.some((c: string) => c.toLowerCase().includes('bananas'))).toBe(true);
   }, 10000);
 });
 

@@ -16,6 +16,7 @@
     "start": "bun run src/index.ts",
     "test": "bun test",
     "test:unit": "bun test tests/ascii.test.ts tests/bio.test.ts tests/cli.test.ts",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check src/ tests/",
     "lint:fix": "biome check --apply src/ tests/",
     "format": "biome format --write src/ tests/"
@@ -35,11 +36,11 @@
     "access": "public"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@biomejs/biome": "latest",
+    "@biomejs/biome": "^2.4.0",
+    "@types/bun": "^1.3.0",
     "typescript": "^5"
   },
   "dependencies": {
-    "sharp": "^0.33.0"
+    "sharp": "^0.34.0"
   }
 }
