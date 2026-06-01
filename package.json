@@ -25,6 +25,10 @@
     "ascii-art",
     "lookup"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Elephant-on-github/w-dot-is.git"
+  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"

@@ -1,4 +1,4 @@
-name: Publish to npm
+name: Publish to npm & GitHub Packages
 
 on:
   release:
@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   publish:
@@ -22,9 +23,16 @@ jobs:
 
       - run: bun run build
 
-      - name: Authenticate with npm
-        run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
+      - name: Publish to npm
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
+          bun publish
 
-      - run: bun publish
+      - name: Publish to GitHub Packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=$GH_TOKEN" >> .npmrc
+          npm publish --registry=https://npm.pkg.github.com/
