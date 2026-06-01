@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun test
+
+      - name: Determine next version
+        id: version
+        run: |
+          latest=$(git tag -l 'v*' | sed 's/^v0*//' | sort -n | tail -1)
+          if [ -z "$latest" ]; then
+            next=1
+          else
+            next=$((latest + 1))
+          fi
+          tag=$(printf "v%03d" $next)
+          npm_ver="0.0.$next"
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+          echo "npm_ver=$npm_ver" >> $GITHUB_OUTPUT
+
+      - name: Update package.json version
+        run: |
+          node -e "
+            const p = require('./package.json');
+            p.version = '${{ steps.version.outputs.npm_ver }}';
+            require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+
+      - run: bun run build
+
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add package.json
+          git commit -m "${{ steps.version.outputs.tag }}"
+          git tag ${{ steps.version.outputs.tag }}
+
+      - name: Publish to npm
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
+          bun publish
+
+      - name: Publish to GitHub Packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=$GH_TOKEN" >> .npmrc
+          npm publish --registry=https://npm.pkg.github.com/
+
+      - name: Push changes
+        run: |
+          git push
+          git push --tags
