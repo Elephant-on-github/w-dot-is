@@ -1,6 +1,6 @@
 # w.is
 
-**What is, who is, where is — `w.is` and it shows you.**
+**What is, who is, where is — `w.is`**
 
 Ask it anything. It'll draw a picture and tell you a story.
 
