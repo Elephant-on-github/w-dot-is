@@ -7,6 +7,8 @@
 
 Ask it anything. It'll draw a picture and tell you a story.
 
+![Recording](media/Recording.gif)
+
 ```
 $ w.is banana
 
