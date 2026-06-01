@@ -1,26 +1,40 @@
 {
-  "name": "w.is",
-  "module": "src/index.ts",
+  "name": "@elephant_dev/w.is",
+  "version": "1.0.0",
+  "description": "Wikipedia lookup CLI — displays color ASCII art and bios of people, places, living things, and things",
   "type": "module",
-  "private": true,
   "bin": {
-    "w.is": "./src/index.ts"
+    "w.is": "./dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
+    "build": "bun build ./src/index.ts --outfile ./dist/cli.js --target node --external sharp",
+    "prepublish": "bun run build",
     "start": "bun run src/index.ts",
     "test": "bun test",
     "lint": "biome check src/ tests/",
     "lint:fix": "biome check --apply src/ tests/",
     "format": "biome format --write src/ tests/"
   },
+  "keywords": [
+    "wikipedia",
+    "cli",
+    "ascii-art",
+    "lookup"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@types/bun": "latest",
-    "@biomejs/biome": "latest"
+    "@biomejs/biome": "latest",
+    "typescript": "^5"
   },
   "dependencies": {
     "sharp": "^0.33.0"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   }
 }

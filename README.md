@@ -1,6 +1,6 @@
 # w.is
 
-**A tiny CLI oracle that turns Wikipedia into terminal art.**
+**What is, who is, where is — `w.is` and it shows you.**
 
 Ask it anything. It'll draw a picture and tell you a story.
 
@@ -45,13 +45,20 @@ false
 ## Install
 
 ```bash
-bun add w.is
+npm install -g @elephant_dev/w.is
 ```
 
-Or run on the fly:
+Then run:
 
 ```bash
-bun run w.is
+w.is <name>
+```
+
+Or one-shot it:
+
+```bash
+npx @elephant_dev/w.is banana
+bunx @elephant_dev/w.is banana
 ```
 
 ## Usage

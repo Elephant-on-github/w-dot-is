@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 import { getAsciiDimensions, imageToAscii } from './ascii';
 import { extractInfo } from './bio';
 import { CliError, CliHelp, parseArgs, printHelp } from './cli';
