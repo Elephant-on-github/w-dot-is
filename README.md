@@ -46,8 +46,12 @@ false
 
 ## Install
 
+Pick your poison:
+
 ```bash
 npm install -g @elephant_dev/w.is
+# or
+bun install -g @elephant_dev/w.is
 ```
 
 Then run:
