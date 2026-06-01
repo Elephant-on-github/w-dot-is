@@ -1,6 +1,8 @@
 # w.is
 
-**What is, who is, where is — `w.is`**
+**What is, who is, where is — `w.is` and it shows you.**
+
+[![npm version](https://img.shields.io/npm/v/@elephant_dev/w.is?color=%23cb3837&logo=npm)](https://www.npmjs.com/package/@elephant_dev/w.is)
 
 Ask it anything. It'll draw a picture and tell you a story.
 
@@ -109,7 +111,7 @@ Each gets a tailored bio — athletes get their medals, cities get their populat
 
 ## Requirements
 
-- [Bun](https://bun.sh) runtime
+- [Node.js](https://nodejs.org) 18 or later (or [Bun](https://bun.sh) for development)
 - A terminal that speaks ANSI true color (the 2020s called)
 
 ## License
