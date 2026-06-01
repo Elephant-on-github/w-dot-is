@@ -15,6 +15,7 @@
     "prepublish": "bun run build",
     "start": "bun run src/index.ts",
     "test": "bun test",
+    "test:unit": "bun test tests/ascii.test.ts tests/bio.test.ts tests/cli.test.ts",
     "lint": "biome check src/ tests/",
     "lint:fix": "biome check --apply src/ tests/",
     "format": "biome format --write src/ tests/"
