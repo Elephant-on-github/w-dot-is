@@ -18,6 +18,14 @@ export async function searchWiki(query: string, limit = 1): Promise<string[]> {
   return data[1];
 }
 
+export async function searchWikiFullTextList(query: string, limit = 10): Promise<string[]> {
+  const url = `${MEDIAWIKI_API}?action=query&list=search&srsearch=${encodeURIComponent(query)}&srwhat=text&format=json&srlimit=${limit}`;
+  const data = await fetchJson<{
+    query: { search: { title: string }[] };
+  }>(url);
+  return data.query.search.map((s) => s.title);
+}
+
 export async function searchWikiFullText(query: string): Promise<string | null> {
   const url = `${MEDIAWIKI_API}?action=query&list=search&srsearch=${encodeURIComponent(query)}&srwhat=text&format=json&srlimit=1`;
   const data = await fetchJson<{
@@ -30,11 +38,27 @@ export async function searchWikiFullText(query: string): Promise<string | null> 
 export async function searchByDatamuse(description: string): Promise<string | null> {
   const url = `${DATAMUSE_API}/words?ml=${encodeURIComponent(description)}&max=5`;
   const data = await fetchJson<{ word: string; score: number }[]>(url);
+  const tokens = tokenizeQuery(description);
+
+  let bestTitle: string | null = null;
+  let bestTokenMatches = -1;
+  let firstTitle: string | null = null;
+
   for (const { word } of data) {
     const found = await searchWiki(word, 1);
-    if (found.length > 0) return found[0]!;
+    if (found.length > 0) {
+      const title = found[0]!;
+      if (firstTitle === null) firstTitle = title;
+
+      const tokenMatches = tokens.filter((t) => title.toLowerCase().includes(t)).length;
+      if (tokenMatches > bestTokenMatches) {
+        bestTokenMatches = tokenMatches;
+        bestTitle = title;
+      }
+    }
   }
-  return null;
+
+  return bestTitle ?? firstTitle;
 }
 
 const STOP_WORDS = new Set([
@@ -341,11 +365,51 @@ export async function resolveEntity(query: string): Promise<{
     }
   }
 
+  const queryTokens = tokenizeQuery(query);
+
+  const ftTitles = await searchWikiFullTextList(query, 10);
+  for (const title of ftTitles) {
+    const summary = await getPageSummary(title);
+    if (summary.type !== 'disambiguation') {
+      const categories = await getPageCategories(title);
+      const fullExtract = await getPageExtract(title);
+      if (fullExtract) summary.fullExtract = fullExtract;
+      candidates.push({ title, summary, categories });
+    } else {
+      const resolved = await resolveDisambiguation(query, summary);
+      if (resolved) candidates.push({ title: resolved.summary.title, ...resolved });
+    }
+    if (candidates.length >= 5) break;
+  }
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => {
+      const aLower = a.title.toLowerCase();
+      const bLower = b.title.toLowerCase();
+      let aTokenMatches = 0;
+      let bTokenMatches = 0;
+      for (const token of queryTokens) {
+        if (aLower.includes(token)) aTokenMatches++;
+        if (bLower.includes(token)) bTokenMatches++;
+      }
+      if (aTokenMatches !== bTokenMatches) return bTokenMatches - aTokenMatches;
+      const bonusA = primaryBonus(a.title, query);
+      const bonusB = primaryBonus(b.title, query);
+      if (bonusA !== bonusB) return bonusB - bonusA;
+      const aHasParen = a.title.includes('(');
+      const bHasParen = b.title.includes('(');
+      if (aHasParen !== bHasParen) return aHasParen ? 1 : -1;
+      return 0;
+    });
+    const best = candidates[0]!;
+    const bestLower = best.title.toLowerCase();
+    if (queryTokens.length === 0 || queryTokens.some((t) => bestLower.includes(t))) {
+      return { summary: best.summary, categories: best.categories };
+    }
+  }
+
   const datamuse = await searchByDatamuse(query);
   if (datamuse) return fetchPageData(datamuse);
-
-  const fullText = await searchWikiFullText(query);
-  if (fullText) return fetchPageData(fullText);
 
   if (titles.length > 0) {
     const firstSummary = await getPageSummary(titles[0]!);
