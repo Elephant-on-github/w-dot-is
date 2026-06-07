@@ -3,6 +3,7 @@ import { getAsciiDimensions, imageToAscii, imageToAsciiSymbolic } from './ascii'
 import { extractInfo } from './bio';
 import { CliError, CliHelp, parseArgs, printHelp } from './cli';
 import { renderDisplay, renderVerify } from './renderer';
+import { withSpinner } from './spinner';
 import { detectDarkBg } from './terminal';
 import { verifyClaim } from './verify';
 import { resolveEntity } from './wikipedia';
@@ -18,7 +19,7 @@ async function main() {
 
   const [darkBg, { summary, categories }] = await Promise.all([
     detectDarkBg(),
-    resolveEntity(args.name),
+    withSpinner('Querying Wikipedia...', () => resolveEntity(args.name)),
   ]);
 
   const info = extractInfo(summary, categories);

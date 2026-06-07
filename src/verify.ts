@@ -1,3 +1,4 @@
+import { withSpinner } from './spinner';
 import type { VerifyResult } from './types';
 import { resolveEntity } from './wikipedia';
 
@@ -30,7 +31,9 @@ function levenshtein(a: string, b: string): number {
 
 export async function verifyClaim(name: string, predicate: string): Promise<VerifyResult> {
   try {
-    const { summary, categories } = await resolveEntity(name);
+    const { summary, categories } = await withSpinner('Querying Wikipedia...', () =>
+      resolveEntity(name),
+    );
     const normalizedPredicate = normalize(predicate);
     const normalizedTitle = normalize(summary.title);
     const normalizedExtract = normalize(summary.extract);
