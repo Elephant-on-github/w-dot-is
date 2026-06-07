@@ -432,39 +432,52 @@ export async function resolveEntity(query: string): Promise<{
   summary: PageSummary;
   categories: string[];
 }> {
-  const titles = await searchWiki(query, MAX_CANDIDATES);
+  let result: { summary: PageSummary; categories: string[] } | null = null;
 
-  if (titles.length > 0) {
+  const titles = await searchWiki(query, MAX_CANDIDATES);
+  if (!result && titles.length > 0) {
     const batchMap = await batchFetchPages(titles);
     const candidates = collectFromBatch(batchMap, query);
     const best = bestTokenMatch(candidates, query);
-    if (best) return { summary: best.summary, categories: best.categories };
+    if (best) result = { summary: best.summary, categories: best.categories };
   }
 
-  const genMap = await searchWithData(query, MAX_CANDIDATES);
-  if (genMap.size > 0) {
-    const candidates = collectFromBatch(genMap, query);
-    const best = bestTokenMatch(candidates, query);
-    if (best) return { summary: best.summary, categories: best.categories };
-  }
-
-  const datamuse = await searchByDatamuse(query);
-  if (datamuse) {
-    const titles2 = await searchWiki(datamuse, 1);
-    if (titles2.length > 0) {
-      const batchMap2 = await batchFetchPages([titles2[0]!]);
-      const page = batchMap2.get(titles2[0]!);
-      if (page && !isDisambig(page)) {
-        const c = batchToCandidate(page);
-        if (c) return { summary: c.summary, categories: c.categories };
-      }
+  if (!result) {
+    const genMap = await searchWithData(query, MAX_CANDIDATES);
+    if (genMap.size > 0) {
+      const candidates = collectFromBatch(genMap, query);
+      const best = bestTokenMatch(candidates, query);
+      if (best) result = { summary: best.summary, categories: best.categories };
     }
-    return resolveFromTitle(datamuse);
   }
 
-  const fullText = await searchWikiFullText(query);
-  if (fullText) {
-    return resolveFromTitle(fullText);
+  if (!result) {
+    const datamuse = await searchByDatamuse(query);
+    if (datamuse) {
+      const titles2 = await searchWiki(datamuse, 1);
+      if (titles2.length > 0) {
+        const batchMap2 = await batchFetchPages([titles2[0]!]);
+        const page = batchMap2.get(titles2[0]!);
+        if (page && !isDisambig(page)) {
+          const c = batchToCandidate(page);
+          if (c) result = { summary: c.summary, categories: c.categories };
+        }
+      }
+      if (!result) result = await resolveFromTitle(datamuse);
+    }
+  }
+
+  if (!result) {
+    const fullText = await searchWikiFullText(query);
+    if (fullText) result = await resolveFromTitle(fullText);
+  }
+
+  if (result) {
+    if (!result.summary.fullExtract) {
+      const full = await getPageExtract(result.summary.title);
+      if (full) result.summary.fullExtract = full;
+    }
+    return result;
   }
 
   if (titles.length > 0) {

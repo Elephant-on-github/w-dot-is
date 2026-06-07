@@ -208,16 +208,16 @@ function extractInfoPlace(_summary: PageSummary, extract: string): string[] {
   }
 
   const populationMatch = extract.match(
-    /population\D*?([0-9,.]+(?:\s*(?:million|billion|thousand|trillion))?)/i,
+    /population\D*?(\d[0-9,.]*(?:\s*(?:million|billion|thousand|trillion))?)/i,
   );
   if (populationMatch) lines.push(`population: ${populationMatch[1]?.trim()}`);
 
-  const gdpMatch = extract.match(/GDP\D*?\$?([0-9,.]+(?:\s*(?:million|billion|trillion))?)/i);
+  const gdpMatch = extract.match(/GDP\D*?\$(\d[\d,.]*(?:\s*(?:million|billion|trillion))?)/i);
   if (gdpMatch) lines.push(`GDP: $${gdpMatch[1]?.trim()}`);
 
   const areaMatch =
-    extract.match(/area[:\s]+([0-9,.]+(?:\s*km²|\s*km2|\s*sq\s*mi(?:les)?)?)/i) ||
-    extract.match(/area\s+of\s+([0-9,.]+(?:\s*km²|\s*km2|\s*sq\s*mi(?:les)?)?)/i);
+    extract.match(/area[:\s]+(\d[0-9,.]*(?:\s*km²|\s*km2|\s*sq\s*mi(?:les)?)?)/i) ||
+    extract.match(/area\s+of\s+(\d[0-9,.]*(?:\s*km²|\s*km2|\s*sq\s*mi(?:les)?)?)/i);
   if (areaMatch) lines.push(`area: ${areaMatch[1]?.trim()}`);
 
   const capitalMatch =
@@ -225,7 +225,8 @@ function extractInfoPlace(_summary: PageSummary, extract: string): string[] {
     extract.match(
       /capital(?:,| is)(?: the)?(?: largest city)?(?: and main cultural and economic centre)? (?:and main cultural and economic centre )?(?:is |of |, )?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/,
     ) ||
-    extract.match(/capital[^.!]*?\b(is|are)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/);
+    extract.match(/capital[^.!]*?\b(is|are)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/) ||
+    extract.match(/capital\s+[a-z]+\s*,\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/);
   if (capitalMatch) {
     const cap = (capitalMatch[2] || capitalMatch[1])?.trim();
     if (cap && cap.length > 1) lines.push(`capital: ${cap}`);
@@ -312,7 +313,7 @@ function extractInfoThing(summary: PageSummary, _extract: string): string[] {
 
 export function extractInfo(summary: PageSummary, categories: string[]): ExtractedInfo {
   const category = detectCategory(summary, categories);
-  const extract = summary.extract;
+  const extract = summary.fullExtract || summary.extract;
 
   let bioLines: string[];
 
