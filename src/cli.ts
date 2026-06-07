@@ -35,8 +35,11 @@ usage:
   w.is --is <name> --a <desc>    check if "<name> is a <desc>"
   w.is --help                    show this help
 
+<name> can be a Wikipedia title or a description (e.g. "wooden handheld board for paint mixing" finds "palette").
+
 examples:
   w.is banana
+  w.is "wooden handheld board for paint mixing"
   w.is --is banana --a fruit
 `);
 }

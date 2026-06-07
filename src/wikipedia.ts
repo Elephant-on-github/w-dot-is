@@ -18,6 +18,15 @@ export async function searchWiki(query: string): Promise<string | null> {
   return titles.length > 0 ? titles[0]! : null;
 }
 
+export async function searchWikiFullText(query: string): Promise<string | null> {
+  const url = `${MEDIAWIKI_API}?action=query&list=search&srsearch=${encodeURIComponent(query)}&srwhat=text&format=json&srlimit=1`;
+  const data = await fetchJson<{
+    query: { search: { title: string }[] };
+  }>(url);
+  const results = data.query.search;
+  return results.length > 0 ? results[0]!.title : null;
+}
+
 export async function getPageSummary(title: string): Promise<PageSummary> {
   const url = `${WIKIPEDIA_API}/page/summary/${encodeURIComponent(title)}`;
   return fetchJson<PageSummary>(url);
@@ -49,7 +58,8 @@ export async function resolveEntity(query: string): Promise<{
   categories: string[];
 }> {
   let title = query;
-  const searchResult = await searchWiki(query);
+  let searchResult = await searchWiki(query);
+  if (!searchResult) searchResult = await searchWikiFullText(query);
   if (searchResult) title = searchResult;
 
   const [summary, categories, fullExtract] = await Promise.all([
