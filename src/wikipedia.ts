@@ -331,18 +331,39 @@ export async function resolveEntity(query: string): Promise<{
       return 0;
     });
 
-    return { summary: candidates[0]!.summary, categories: candidates[0]!.categories };
+    const best = candidates[0]!;
+    const bestLower = best.title.toLowerCase();
+    const hasTokenMatch =
+      queryTokens.length === 0 || queryTokens.some((t) => bestLower.includes(t));
+
+    if (hasTokenMatch) {
+      return { summary: best.summary, categories: best.categories };
+    }
   }
 
-  const firstSummary = await getPageSummary(titles[0]!);
-  const entries = parseDisambigExtract(firstSummary.extract || '');
-  const suggestions = entries
-    .slice(0, 8)
-    .map((e) => `  \x1b[1m${e.title}\x1b[0m \u2014 ${e.description || 'Wikipedia article'}`)
-    .join('\n');
-  const more = entries.length > 8 ? `\n  ... and ${entries.length - 8} more` : '';
+  const datamuse = await searchByDatamuse(query);
+  if (datamuse) return fetchPageData(datamuse);
 
-  throw Object.assign(new Error(`"${query}" is ambiguous. Try one of:\n\n${suggestions}${more}`), {
-    _suggestions: true,
-  });
+  const fullText = await searchWikiFullText(query);
+  if (fullText) return fetchPageData(fullText);
+
+  if (titles.length > 0) {
+    const firstSummary = await getPageSummary(titles[0]!);
+    const entries = parseDisambigExtract(firstSummary.extract || '');
+    if (entries.length > 0) {
+      const suggestions = entries
+        .slice(0, 8)
+        .map((e) => `  \x1b[1m${e.title}\x1b[0m \u2014 ${e.description || 'Wikipedia article'}`)
+        .join('\n');
+      const more = entries.length > 8 ? `\n  ... and ${entries.length - 8} more` : '';
+      throw Object.assign(
+        new Error(`"${query}" is ambiguous. Try one of:\n\n${suggestions}${more}`),
+        {
+          _suggestions: true,
+        },
+      );
+    }
+  }
+
+  throw new Error(`no Wikipedia article found for "${query}"`);
 }
