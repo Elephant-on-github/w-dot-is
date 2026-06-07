@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 
+const UA = 'w.is-cli/1.0 (https://github.com/Elephant-on-github/w.is)';
 const SIMILARITY_THRESHOLD = 40;
 
 function luminance(r: number, g: number, b: number): number {
@@ -22,7 +23,7 @@ export async function imageToAscii(
   targetLines: number,
   _darkBg: boolean,
 ): Promise<string> {
-  const res = await fetch(imageUrl);
+  const res = await fetch(imageUrl, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`failed to fetch image: ${res.status}`);
 
   const buffer = Buffer.from(await res.arrayBuffer());
@@ -163,7 +164,7 @@ export async function imageToAsciiSymbolic(
   targetLines: number,
   darkBg: boolean,
 ): Promise<string> {
-  const res = await fetch(imageUrl);
+  const res = await fetch(imageUrl, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`failed to fetch image: ${res.status}`);
 
   const buffer = Buffer.from(await res.arrayBuffer());
@@ -197,7 +198,7 @@ export async function imageToAsciiSymbolic(
   if (lines > targetLines) lines = targetLines;
 
   const pixelW = chars * 2;
-  const pixelH = lines;
+  const pixelH = lines * 2;
 
   const remainingChars = targetChars - chars;
   const padLeft = Math.floor(remainingChars / 2);
@@ -258,7 +259,7 @@ export async function imageToAsciiBg(
   targetLines: number,
   _darkBg: boolean,
 ): Promise<string> {
-  const res = await fetch(imageUrl);
+  const res = await fetch(imageUrl, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`failed to fetch image: ${res.status}`);
 
   const buffer = Buffer.from(await res.arrayBuffer());
@@ -292,7 +293,7 @@ export async function imageToAsciiBg(
   if (lines > targetLines) lines = targetLines;
 
   const pixelW = chars * 2;
-  const pixelH = lines;
+  const pixelH = lines * 2;
 
   const remainingChars = targetChars - chars;
   const padLeft = Math.floor(remainingChars / 2);
