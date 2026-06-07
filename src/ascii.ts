@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 
-const LUM_THRESHOLD = 128;
+const SIMILARITY_THRESHOLD = 40;
 
 function luminance(r: number, g: number, b: number): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -73,46 +73,29 @@ export async function imageToAscii(
     .toBuffer({ resolveWithObject: true });
 
   const channels = info.channels;
-  const rows = pixelH;
-  const cols = chars;
 
-  const avgPixels: { r: number; g: number; b: number; lum: number }[] = [];
+  interface Pixel {
+    r: number;
+    g: number;
+    b: number;
+    lum: number;
+  }
+
+  const cols = chars;
+  const rows = pixelH;
+  const grid: Pixel[][] = [];
 
   for (let y = 0; y < rows; y++) {
+    const row: Pixel[] = [];
     for (let x = 0; x < pixelW; x += 2) {
       const i1 = y * pixelW + x;
       const i2 = y * pixelW + Math.min(x + 1, pixelW - 1);
       const r = Math.round((data[i1 * channels]! + data[i2 * channels]!) / 2);
       const g = Math.round((data[i1 * channels + 1]! + data[i2 * channels + 1]!) / 2);
       const b = Math.round((data[i1 * channels + 2]! + data[i2 * channels + 2]!) / 2);
-      avgPixels.push({ r, g, b, lum: luminance(r, g, b) });
+      row.push({ r, g, b, lum: luminance(r, g, b) });
     }
-  }
-
-  const dithered = avgPixels.map((p) => p.lum);
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      const i = y * cols + x;
-      const oldLum = dithered[i]!;
-      const newLum = oldLum > LUM_THRESHOLD ? 255 : 0;
-      const error = oldLum - newLum;
-      dithered[i] = newLum;
-
-      if (x + 1 < cols) dithered[y * cols + x + 1]! += error * (7 / 16);
-      if (y + 1 < rows) {
-        if (x > 0) dithered[(y + 1) * cols + x - 1]! += error * (3 / 16);
-        dithered[(y + 1) * cols + x]! += error * (5 / 16);
-        if (x + 1 < cols) dithered[(y + 1) * cols + x + 1]! += error * (1 / 16);
-      }
-    }
-  }
-
-  function px(y: number, x: number) {
-    return avgPixels[y * cols + x]!;
-  }
-
-  function isBright(y: number, x: number) {
-    return dithered[y * cols + x]! > LUM_THRESHOLD;
+    grid.push(row);
   }
 
   const outLines: string[] = [];
@@ -124,30 +107,19 @@ export async function imageToAscii(
     let lastFg: [number, number, number] | null = null;
     let lastBg: [number, number, number] | null = null;
 
-    const topRow = y * 2;
-    const botRow = y * 2 + 1;
+    const topRow = grid[y * 2]!;
+    const botRow = grid[y * 2 + 1]!;
 
     for (let x = 0; x < cols; x++) {
-      const topPx = px(topRow, x);
-      const botPx = px(botRow, x);
-      const topBright = isBright(topRow, x);
-      const botBright = isBright(botRow, x);
+      const top = topRow[x]!;
+      const bot = botRow[x]!;
+      const diff = Math.abs(top.lum - bot.lum);
 
-      if (!topBright && !botBright) {
-        if (lastFg !== null || lastBg !== null) {
-          line += '\x1b[0m';
-          lastFg = null;
-          lastBg = null;
-        }
-        line += ' ';
-        continue;
-      }
-
-      if (topBright && botBright) {
+      if (diff < SIMILARITY_THRESHOLD) {
         const fg: [number, number, number] = [
-          Math.round((topPx.r + botPx.r) / 2),
-          Math.round((topPx.g + botPx.g) / 2),
-          Math.round((topPx.b + botPx.b) / 2),
+          Math.round((top.r + bot.r) / 2),
+          Math.round((top.g + bot.g) / 2),
+          Math.round((top.b + bot.b) / 2),
         ];
         if (fmtKey(lastFg) !== fmtKey(fg) || lastBg !== null) {
           line += colorSeq(fg);
@@ -155,24 +127,18 @@ export async function imageToAscii(
           lastBg = null;
         }
         line += '█';
-        continue;
-      }
-
-      if (topBright && !botBright) {
-        const fg: [number, number, number] = [topPx.r, topPx.g, topPx.b];
-        const bg: [number, number, number] = [botPx.r, botPx.g, botPx.b];
+      } else if (top.lum > bot.lum) {
+        const fg: [number, number, number] = [top.r, top.g, top.b];
+        const bg: [number, number, number] = [bot.r, bot.g, bot.b];
         if (fmtKey(lastFg) !== fmtKey(fg) || fmtKey(lastBg) !== fmtKey(bg)) {
           line += colorSeq(fg, bg);
           lastFg = fg;
           lastBg = bg;
         }
         line += '▀';
-        continue;
-      }
-
-      {
-        const fg: [number, number, number] = [botPx.r, botPx.g, botPx.b];
-        const bg: [number, number, number] = [topPx.r, topPx.g, topPx.b];
+      } else {
+        const fg: [number, number, number] = [bot.r, bot.g, bot.b];
+        const bg: [number, number, number] = [top.r, top.g, top.b];
         if (fmtKey(lastFg) !== fmtKey(fg) || fmtKey(lastBg) !== fmtKey(bg)) {
           line += colorSeq(fg, bg);
           lastFg = fg;
