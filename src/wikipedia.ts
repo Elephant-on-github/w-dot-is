@@ -2,6 +2,7 @@ import type { PageSummary } from './types';
 
 const WIKIPEDIA_API = 'https://en.wikipedia.org/api/rest_v1';
 const MEDIAWIKI_API = 'https://en.wikipedia.org/w/api.php';
+const DATAMUSE_API = 'https://api.datamuse.com';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, {
@@ -25,6 +26,16 @@ export async function searchWikiFullText(query: string): Promise<string | null> 
   }>(url);
   const results = data.query.search;
   return results.length > 0 ? results[0]!.title : null;
+}
+
+export async function searchByDatamuse(description: string): Promise<string | null> {
+  const url = `${DATAMUSE_API}/words?ml=${encodeURIComponent(description)}&max=5`;
+  const data = await fetchJson<{ word: string; score: number }[]>(url);
+  for (const { word } of data) {
+    const found = await searchWiki(word);
+    if (found) return found;
+  }
+  return null;
 }
 
 export async function getPageSummary(title: string): Promise<PageSummary> {
@@ -59,6 +70,7 @@ export async function resolveEntity(query: string): Promise<{
 }> {
   let title = query;
   let searchResult = await searchWiki(query);
+  if (!searchResult) searchResult = await searchByDatamuse(query);
   if (!searchResult) searchResult = await searchWikiFullText(query);
   if (searchResult) title = searchResult;
 
