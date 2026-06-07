@@ -297,7 +297,7 @@ async function batchFetchPages(titles: string[]): Promise<Map<string, BatchPage>
     `${MEDIAWIKI_API}?action=query` +
     `&titles=${encodeURIComponent(titles.join('|'))}` +
     `&prop=extracts|categories|pageimages|pageprops|description` +
-    `&pithumbsize=1000&explaintext=1&exintro=1&cllimit=50&format=json&formatversion=2`;
+    `&redirects=1&pithumbsize=1000&explaintext=1&exintro=1&cllimit=50&format=json&formatversion=2`;
   const data = await fetchJson<{ query: { pages: BatchPage[] } }>(url);
   const map = new Map<string, BatchPage>();
   for (const page of data.query.pages) {
@@ -379,6 +379,19 @@ function bestTokenMatch(candidates: Candidate[], query: string): Candidate | nul
 
 const MAX_CANDIDATES = 5;
 
+const QUERY_ALIASES: Record<string, string> = {
+  usa: 'United States',
+  uk: 'United Kingdom',
+  uae: 'United Arab Emirates',
+  us: 'United States',
+  drc: 'Democratic Republic of the Congo',
+  dprk: 'North Korea',
+  sk: 'South Korea',
+  nz: 'New Zealand',
+  sa: 'Saudi Arabia',
+  aus: 'Australia',
+};
+
 function collectFromBatch(map: Map<string, BatchPage>, query: string): Candidate[] {
   const candidates: Candidate[] = [];
   for (const page of map.values()) {
@@ -434,7 +447,17 @@ export async function resolveEntity(query: string): Promise<{
 }> {
   let result: { summary: PageSummary; categories: string[] } | null = null;
 
-  const titles = await searchWiki(query, MAX_CANDIDATES);
+  const alias = QUERY_ALIASES[query.toLowerCase()];
+  if (alias) {
+    const batchMap = await batchFetchPages([alias]);
+    const page = batchMap.get(alias);
+    if (page && !isDisambig(page)) {
+      const c = batchToCandidate(page);
+      if (c) result = { summary: c.summary, categories: c.categories };
+    }
+  }
+
+  const titles = result ? [] : await searchWiki(query, MAX_CANDIDATES);
   if (!result && titles.length > 0) {
     const batchMap = await batchFetchPages(titles);
     const candidates = collectFromBatch(batchMap, query);
