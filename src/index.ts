@@ -64,6 +64,10 @@ main().catch((err) => {
     console.error(`error: ${err.message}`);
     process.exit(1);
   }
+  if (err._suggestions) {
+    console.error(err.message);
+    process.exit(1);
+  }
   console.error('error:', err.message);
   process.exit(1);
 });

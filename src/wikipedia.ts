@@ -12,11 +12,10 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function searchWiki(query: string): Promise<string | null> {
-  const url = `${MEDIAWIKI_API}?action=opensearch&search=${encodeURIComponent(query)}&limit=1&format=json`;
+export async function searchWiki(query: string, limit = 1): Promise<string[]> {
+  const url = `${MEDIAWIKI_API}?action=opensearch&search=${encodeURIComponent(query)}&limit=${limit}&format=json`;
   const data = await fetchJson<[string, string[], string[], string[]]>(url);
-  const titles = data[1];
-  return titles.length > 0 ? titles[0]! : null;
+  return data[1];
 }
 
 export async function searchWikiFullText(query: string): Promise<string | null> {
@@ -32,8 +31,8 @@ export async function searchByDatamuse(description: string): Promise<string | nu
   const url = `${DATAMUSE_API}/words?ml=${encodeURIComponent(description)}&max=5`;
   const data = await fetchJson<{ word: string; score: number }[]>(url);
   for (const { word } of data) {
-    const found = await searchWiki(word);
-    if (found) return found;
+    const found = await searchWiki(word, 1);
+    if (found.length > 0) return found[0]!;
   }
   return null;
 }
@@ -122,7 +121,6 @@ const STOP_WORDS = new Set([
   'its',
   'also',
   'can',
-  'its',
   'them',
   'their',
   'they',
@@ -146,16 +144,25 @@ function tokenizeQuery(query: string): string[] {
     .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
 }
 
-function scoreText(text: string, tokens: string[]): number {
-  const lower = text.toLowerCase();
+function scoreEntry(title: string, description: string, tokens: string[]): number {
+  const lowerTitle = title.toLowerCase();
+  const lowerDesc = description.toLowerCase();
+  const combined = `${lowerTitle} ${lowerDesc}`;
+
   let score = 0;
   for (const token of tokens) {
     const regex = new RegExp(`\\b${token}\\w*\\b`, 'gi');
-    const matches = lower.match(regex);
+    const matches = combined.match(regex);
     if (matches) score += matches.length;
+
+    if (lowerTitle.includes(token)) score += 3;
+    if (lowerDesc.includes(token)) score += 1;
   }
+
   return score;
 }
+
+const ENTRY_RE = /^\s*(?:\*\s*)?(?:\[\[)?([^\]]+?)(?:\]\])?(?:\s*[,—–-]\s*(.*))?$/;
 
 function parseDisambigExtract(extract: string): { title: string; description: string }[] {
   const lines = extract
@@ -165,11 +172,19 @@ function parseDisambigExtract(extract: string): { title: string; description: st
   const entries: { title: string; description: string }[] = [];
   for (const line of lines) {
     if (line.includes('may refer to:')) continue;
-    const commaIndex = line.indexOf(',');
-    if (commaIndex === -1) continue;
+
+    const m = line.match(ENTRY_RE);
+    if (!m) continue;
+
+    let title = m[1]?.trim();
+    if (!title || title.startsWith('may refer to')) continue;
+
+    title = title.replace(/\(disambiguation\)\s*$/i, '').trim();
+    if (!title) continue;
+
     entries.push({
-      title: line.slice(0, commaIndex).trim(),
-      description: line.slice(commaIndex + 1).trim(),
+      title,
+      description: m[2]?.trim() ?? '',
     });
   }
   return entries;
@@ -183,33 +198,38 @@ export async function resolveDisambiguation(
   if (entries.length === 0) return null;
 
   const tokens = tokenizeQuery(query);
-  if (tokens.length === 0) return null;
 
-  let bestEntry: { title: string; description: string } | null = null;
+  if (tokens.length === 0) {
+    const first = entries[0]!;
+    const resolvedTitle = first.title;
+    return fetchPageData(resolvedTitle);
+  }
+
+  let bestEntry = entries[0]!;
   let bestScore = 0;
 
   for (const entry of entries) {
-    const score = scoreText(`${entry.title} ${entry.description}`, tokens);
+    const score = scoreEntry(entry.title, entry.description, tokens);
     if (score > bestScore) {
       bestScore = score;
       bestEntry = entry;
     }
   }
 
-  if (!bestEntry || bestScore === 0) return null;
+  return fetchPageData(bestEntry.title);
+}
 
-  const resolvedTitle = await searchWiki(bestEntry.title);
-  if (!resolvedTitle) return null;
-
-  const [newSummary, newCategories, newFullExtract] = await Promise.all([
-    getPageSummary(resolvedTitle),
-    getPageCategories(resolvedTitle),
-    getPageExtract(resolvedTitle),
+async function fetchPageData(title: string): Promise<{
+  summary: PageSummary;
+  categories: string[];
+}> {
+  const [summary, categories, fullExtract] = await Promise.all([
+    getPageSummary(title),
+    getPageCategories(title),
+    getPageExtract(title),
   ]);
-
-  if (newFullExtract) newSummary.fullExtract = newFullExtract;
-
-  return { summary: newSummary, categories: newCategories };
+  if (fullExtract) summary.fullExtract = fullExtract;
+  return { summary, categories };
 }
 
 export async function getPageSummary(title: string): Promise<PageSummary> {
@@ -242,27 +262,40 @@ export async function resolveEntity(query: string): Promise<{
   summary: PageSummary;
   categories: string[];
 }> {
-  let title = query;
-  let searchResult = await searchWiki(query);
-  if (!searchResult) searchResult = await searchByDatamuse(query);
-  if (!searchResult) searchResult = await searchWikiFullText(query);
-  if (searchResult) title = searchResult;
+  const titles = await searchWiki(query, 10);
+  if (titles.length === 0) {
+    const datamuse = await searchByDatamuse(query);
+    if (datamuse) return fetchPageData(datamuse);
 
-  let [summary, categories, fullExtract] = await Promise.all([
-    getPageSummary(title),
-    getPageCategories(title),
-    getPageExtract(title),
-  ]);
+    const fullText = await searchWikiFullText(query);
+    if (fullText) return fetchPageData(fullText);
 
-  if (fullExtract) summary.fullExtract = fullExtract;
-
-  if (summary.type === 'disambiguation') {
-    const resolved = await resolveDisambiguation(query, summary);
-    if (resolved) {
-      summary = resolved.summary;
-      categories = resolved.categories;
-    }
+    throw new Error(`no Wikipedia article found for "${query}"`);
   }
 
-  return { summary, categories };
+  for (const title of titles) {
+    const summary = await getPageSummary(title);
+
+    if (summary.type !== 'disambiguation') {
+      const categories = await getPageCategories(title);
+      const fullExtract = await getPageExtract(title);
+      if (fullExtract) summary.fullExtract = fullExtract;
+      return { summary, categories };
+    }
+
+    const resolved = await resolveDisambiguation(query, summary);
+    if (resolved) return resolved;
+  }
+
+  const firstSummary = await getPageSummary(titles[0]!);
+  const entries = parseDisambigExtract(firstSummary.extract || '');
+  const suggestions = entries
+    .slice(0, 8)
+    .map((e) => `  \x1b[1m${e.title}\x1b[0m \u2014 ${e.description || 'Wikipedia article'}`)
+    .join('\n');
+  const more = entries.length > 8 ? `\n  ... and ${entries.length - 8} more` : '';
+
+  throw Object.assign(new Error(`"${query}" is ambiguous. Try one of:\n\n${suggestions}${more}`), {
+    _suggestions: true,
+  });
 }
