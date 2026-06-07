@@ -198,7 +198,7 @@ export async function imageToAsciiSymbolic(
   if (lines > targetLines) lines = targetLines;
 
   const pixelW = chars * 2;
-  const pixelH = lines * 2;
+  const pixelH = lines;
 
   const remainingChars = targetChars - chars;
   const padLeft = Math.floor(remainingChars / 2);
@@ -293,7 +293,7 @@ export async function imageToAsciiBg(
   if (lines > targetLines) lines = targetLines;
 
   const pixelW = chars * 2;
-  const pixelH = lines * 2;
+  const pixelH = lines;
 
   const remainingChars = targetChars - chars;
   const padLeft = Math.floor(remainingChars / 2);
