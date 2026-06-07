@@ -1,27 +1,25 @@
 import sharp from 'sharp';
 
-const CHARS = ' .-:=+*#%@░▒▓█';
-
-function rgbToAnsi(r: number, g: number, b: number): string {
-  return `\x1b[38;2;${r};${g};${b}m`;
-}
+const LUM_THRESHOLD = 128;
 
 function luminance(r: number, g: number, b: number): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-function charForLuminance(lum: number, darkBg: boolean): string {
-  const idx = darkBg
-    ? Math.floor((lum / 255) * (CHARS.length - 1))
-    : Math.floor((1 - lum / 255) * (CHARS.length - 1));
-  return CHARS[Math.min(idx, CHARS.length - 1)]!;
+function colorSeq(fg: [number, number, number], bg?: [number, number, number]): string {
+  const fgSeq = `\x1b[38;2;${fg[0]};${fg[1]};${fg[2]}m`;
+  return bg ? `${fgSeq}\x1b[48;2;${bg[0]};${bg[1]};${bg[2]}m` : fgSeq;
+}
+
+function fmtKey(c: [number, number, number] | null): string {
+  return c ? c.join(',') : '';
 }
 
 export async function imageToAscii(
   imageUrl: string,
   targetChars: number,
   targetLines: number,
-  darkBg: boolean,
+  _darkBg: boolean,
 ): Promise<string> {
   const res = await fetch(imageUrl);
   if (!res.ok) throw new Error(`failed to fetch image: ${res.status}`);
@@ -57,7 +55,7 @@ export async function imageToAscii(
   if (lines > targetLines) lines = targetLines;
 
   const pixelW = chars * 2;
-  const pixelH = lines;
+  const pixelH = lines * 2;
 
   const remainingChars = targetChars - chars;
   const padLeft = Math.floor(remainingChars / 2);
@@ -66,46 +64,128 @@ export async function imageToAscii(
     .resize(pixelW, pixelH, {
       fit: 'fill',
       withoutEnlargement: false,
-      kernel: sharp.kernel.cubic,
+      kernel: sharp.kernel.lanczos3,
     })
     .normalize()
+    .sharpen()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
   const channels = info.channels;
-  const linesOut: string[] = [];
+  const rows = pixelH;
+  const cols = chars;
 
-  for (let y = 0; y < pixelH; y++) {
+  const avgPixels: { r: number; g: number; b: number; lum: number }[] = [];
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < pixelW; x += 2) {
+      const i1 = y * pixelW + x;
+      const i2 = y * pixelW + Math.min(x + 1, pixelW - 1);
+      const r = Math.round((data[i1 * channels]! + data[i2 * channels]!) / 2);
+      const g = Math.round((data[i1 * channels + 1]! + data[i2 * channels + 1]!) / 2);
+      const b = Math.round((data[i1 * channels + 2]! + data[i2 * channels + 2]!) / 2);
+      avgPixels.push({ r, g, b, lum: luminance(r, g, b) });
+    }
+  }
+
+  const dithered = avgPixels.map((p) => p.lum);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const i = y * cols + x;
+      const oldLum = dithered[i]!;
+      const newLum = oldLum > LUM_THRESHOLD ? 255 : 0;
+      const error = oldLum - newLum;
+      dithered[i] = newLum;
+
+      if (x + 1 < cols) dithered[y * cols + x + 1]! += error * (7 / 16);
+      if (y + 1 < rows) {
+        if (x > 0) dithered[(y + 1) * cols + x - 1]! += error * (3 / 16);
+        dithered[(y + 1) * cols + x]! += error * (5 / 16);
+        if (x + 1 < cols) dithered[(y + 1) * cols + x + 1]! += error * (1 / 16);
+      }
+    }
+  }
+
+  function px(y: number, x: number) {
+    return avgPixels[y * cols + x]!;
+  }
+
+  function isBright(y: number, x: number) {
+    return dithered[y * cols + x]! > LUM_THRESHOLD;
+  }
+
+  const outLines: string[] = [];
+
+  for (let y = 0; y < lines; y++) {
     let line = '';
-    let lastR = -1;
-    let lastG = -1;
-    let lastB = -1;
-
     line += ' '.repeat(padLeft);
 
-    for (let x = 0; x < pixelW; x += 2) {
-      const px1 = (y * pixelW + x) * channels;
-      const px2 = (y * pixelW + Math.min(x + 1, pixelW - 1)) * channels;
-      const r = Math.round((data[px1]! + data[px2]!) / 2);
-      const g = Math.round((data[px1 + 1]! + data[px2 + 1]!) / 2);
-      const b = Math.round((data[px1 + 2]! + data[px2 + 2]!) / 2);
+    let lastFg: [number, number, number] | null = null;
+    let lastBg: [number, number, number] | null = null;
 
-      if (r !== lastR || g !== lastG || b !== lastB) {
-        line += rgbToAnsi(r, g, b);
-        lastR = r;
-        lastG = g;
-        lastB = b;
+    const topRow = y * 2;
+    const botRow = y * 2 + 1;
+
+    for (let x = 0; x < cols; x++) {
+      const topPx = px(topRow, x);
+      const botPx = px(botRow, x);
+      const topBright = isBright(topRow, x);
+      const botBright = isBright(botRow, x);
+
+      if (!topBright && !botBright) {
+        if (lastFg !== null || lastBg !== null) {
+          line += '\x1b[0m';
+          lastFg = null;
+          lastBg = null;
+        }
+        line += ' ';
+        continue;
       }
 
-      const lum = luminance(r, g, b);
-      line += charForLuminance(lum, darkBg);
+      if (topBright && botBright) {
+        const fg: [number, number, number] = [
+          Math.round((topPx.r + botPx.r) / 2),
+          Math.round((topPx.g + botPx.g) / 2),
+          Math.round((topPx.b + botPx.b) / 2),
+        ];
+        if (fmtKey(lastFg) !== fmtKey(fg) || lastBg !== null) {
+          line += colorSeq(fg);
+          lastFg = fg;
+          lastBg = null;
+        }
+        line += '█';
+        continue;
+      }
+
+      if (topBright && !botBright) {
+        const fg: [number, number, number] = [topPx.r, topPx.g, topPx.b];
+        const bg: [number, number, number] = [botPx.r, botPx.g, botPx.b];
+        if (fmtKey(lastFg) !== fmtKey(fg) || fmtKey(lastBg) !== fmtKey(bg)) {
+          line += colorSeq(fg, bg);
+          lastFg = fg;
+          lastBg = bg;
+        }
+        line += '▀';
+        continue;
+      }
+
+      {
+        const fg: [number, number, number] = [botPx.r, botPx.g, botPx.b];
+        const bg: [number, number, number] = [topPx.r, topPx.g, topPx.b];
+        if (fmtKey(lastFg) !== fmtKey(fg) || fmtKey(lastBg) !== fmtKey(bg)) {
+          line += colorSeq(fg, bg);
+          lastFg = fg;
+          lastBg = bg;
+        }
+        line += '▄';
+      }
     }
 
     line += '\x1b[0m';
-    linesOut.push(line);
+    outLines.push(line);
   }
 
-  return linesOut.join('\n');
+  return outLines.join('\n');
 }
 
 export function getAsciiDimensions(
