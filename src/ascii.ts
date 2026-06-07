@@ -155,6 +155,103 @@ export async function imageToAscii(
   return outLines.join('\n');
 }
 
+const SYMBOLIC_CHARS = ' .-:=+*#%@\u2591\u2592\u2593\u2588';
+
+export async function imageToAsciiSymbolic(
+  imageUrl: string,
+  targetChars: number,
+  targetLines: number,
+  darkBg: boolean,
+): Promise<string> {
+  const res = await fetch(imageUrl);
+  if (!res.ok) throw new Error(`failed to fetch image: ${res.status}`);
+
+  const buffer = Buffer.from(await res.arrayBuffer());
+
+  const meta = await sharp(buffer).metadata();
+  const imgW = meta.width ?? 800;
+  const imgH = meta.height ?? 600;
+
+  const charAspect = (imgW / imgH) * 2;
+
+  let chars: number;
+  let lines: number;
+
+  if (charAspect >= targetChars / targetLines) {
+    chars = Math.min(targetChars, Math.max(1, Math.ceil(imgW / 2)));
+    lines = Math.max(1, Math.round(chars / charAspect));
+    if (lines > targetLines) {
+      lines = targetLines;
+      chars = Math.max(1, Math.round(lines * charAspect));
+    }
+  } else {
+    lines = Math.min(targetLines, Math.max(1, Math.ceil(imgH)));
+    chars = Math.max(1, Math.round(lines * charAspect));
+    if (chars > targetChars) {
+      chars = targetChars;
+      lines = Math.max(1, Math.round(chars / charAspect));
+    }
+  }
+
+  if (chars > targetChars) chars = targetChars;
+  if (lines > targetLines) lines = targetLines;
+
+  const pixelW = chars * 2;
+  const pixelH = lines;
+
+  const remainingChars = targetChars - chars;
+  const padLeft = Math.floor(remainingChars / 2);
+
+  const { data, info } = await sharp(buffer)
+    .resize(pixelW, pixelH, {
+      fit: 'fill',
+      withoutEnlargement: false,
+      kernel: sharp.kernel.lanczos3,
+    })
+    .normalize()
+    .sharpen()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const channels = info.channels;
+  const linesOut: string[] = [];
+
+  for (let y = 0; y < pixelH; y++) {
+    let line = '';
+    let lastR = -1;
+    let lastG = -1;
+    let lastB = -1;
+
+    line += ' '.repeat(padLeft);
+
+    for (let x = 0; x < pixelW; x += 2) {
+      const px1 = (y * pixelW + x) * channels;
+      const px2 = (y * pixelW + Math.min(x + 1, pixelW - 1)) * channels;
+      const r = Math.round((data[px1]! + data[px2]!) / 2);
+      const g = Math.round((data[px1 + 1]! + data[px2 + 1]!) / 2);
+      const b = Math.round((data[px1 + 2]! + data[px2 + 2]!) / 2);
+
+      if (r !== lastR || g !== lastG || b !== lastB) {
+        line += `\x1b[38;2;${r};${g};${b}m`;
+        lastR = r;
+        lastG = g;
+        lastB = b;
+      }
+
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const idx = darkBg
+        ? Math.floor((lum / 255) * (SYMBOLIC_CHARS.length - 1))
+        : Math.floor((1 - lum / 255) * (SYMBOLIC_CHARS.length - 1));
+      line += SYMBOLIC_CHARS[Math.min(idx, SYMBOLIC_CHARS.length - 1)]!;
+    }
+
+    line += '\x1b[0m';
+    linesOut.push(line);
+  }
+
+  return linesOut.join('\n');
+}
+
 export function getAsciiDimensions(
   terminalWidth: number,
   terminalHeight: number,

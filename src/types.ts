@@ -4,6 +4,7 @@ export interface ParsedArgs {
   name: string;
   predicate?: string;
   mode: 'display' | 'verify';
+  ascii?: boolean;
 }
 
 export interface PageSummary {

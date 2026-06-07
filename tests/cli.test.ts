@@ -4,7 +4,7 @@ import { CliError, CliHelp, parseArgs } from '../src/cli';
 describe('parseArgs', () => {
   it('parses display mode with a single name', () => {
     const result = parseArgs(['banana']);
-    expect(result).toEqual({ name: 'banana', mode: 'display' });
+    expect(result).toEqual({ name: 'banana', mode: 'display', ascii: false });
   });
 
   it('parses verify mode with --is and --a', () => {

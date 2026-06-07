@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { getAsciiDimensions, imageToAscii } from './ascii';
+import { getAsciiDimensions, imageToAscii, imageToAsciiSymbolic } from './ascii';
 import { extractInfo } from './bio';
 import { CliError, CliHelp, parseArgs, printHelp } from './cli';
 import { renderDisplay, renderVerify } from './renderer';
@@ -32,7 +32,11 @@ async function main() {
   let asciiArt = '';
   if (info.imageUrl) {
     try {
-      asciiArt = await imageToAscii(info.imageUrl, dims.chars, dims.lines, darkBg);
+      if (args.ascii) {
+        asciiArt = await imageToAsciiSymbolic(info.imageUrl, dims.chars, dims.lines, darkBg);
+      } else {
+        asciiArt = await imageToAscii(info.imageUrl, dims.chars, dims.lines, darkBg);
+      }
     } catch {
       asciiArt = `[image not available for ${summary.title}]`;
     }
