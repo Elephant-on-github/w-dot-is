@@ -366,17 +366,6 @@ function sortCandidates(candidates: Candidate[], query: string): void {
   });
 }
 
-function bestTokenMatch(candidates: Candidate[], query: string): Candidate | null {
-  if (candidates.length === 0) return null;
-  sortCandidates(candidates, query);
-  const best = candidates[0]!;
-  const queryTokens = tokenizeQuery(query);
-  if (queryTokens.length === 0) return best;
-  const bestLower = best.title.toLowerCase();
-  if (queryTokens.some((t) => bestLower.includes(t))) return best;
-  return null;
-}
-
 const MAX_CANDIDATES = 5;
 
 const QUERY_ALIASES: Record<string, string> = {
@@ -461,17 +450,23 @@ export async function resolveEntity(query: string): Promise<{
   if (!result && titles.length > 0) {
     const batchMap = await batchFetchPages(titles);
     const candidates = collectFromBatch(batchMap, query);
-    const best = bestTokenMatch(candidates, query);
-    if (best) result = { summary: best.summary, categories: best.categories };
+    sortCandidates(candidates, query);
+    if (candidates.length > 0)
+      result = { summary: candidates[0]!.summary, categories: candidates[0]!.categories };
   }
 
   if (!result) {
     const genMap = await searchWithData(query, MAX_CANDIDATES);
     if (genMap.size > 0) {
       const candidates = collectFromBatch(genMap, query);
-      const best = bestTokenMatch(candidates, query);
-      if (best) result = { summary: best.summary, categories: best.categories };
+      if (candidates.length > 0)
+        result = { summary: candidates[0]!.summary, categories: candidates[0]!.categories };
     }
+  }
+
+  if (!result && query.length <= 5) {
+    const upper = query.toUpperCase();
+    if (upper !== query) result = await resolveFromTitle(upper);
   }
 
   if (!result) {
