@@ -8,6 +8,7 @@ export interface ParsedArgs {
 
 export interface PageSummary {
   title: string;
+  type?: string;
   extract: string;
   description?: string;
   thumbnail?: { source: string; width: number; height: number };
