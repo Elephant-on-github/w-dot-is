@@ -347,13 +347,13 @@ function batchToCandidate(page: BatchPage): Candidate | null {
 function sortCandidates(candidates: Candidate[], query: string): void {
   const queryTokens = tokenizeQuery(query);
   candidates.sort((a, b) => {
-    const aLower = a.title.toLowerCase();
-    const bLower = b.title.toLowerCase();
+    const aText = `${a.title} ${a.summary.description || ''}`.toLowerCase();
+    const bText = `${b.title} ${b.summary.description || ''}`.toLowerCase();
     let aTokenMatches = 0;
     let bTokenMatches = 0;
     for (const token of queryTokens) {
-      if (aLower.includes(token)) aTokenMatches++;
-      if (bLower.includes(token)) bTokenMatches++;
+      if (aText.includes(token)) aTokenMatches++;
+      if (bText.includes(token)) bTokenMatches++;
     }
     if (aTokenMatches !== bTokenMatches) return bTokenMatches - aTokenMatches;
     const bonusA = primaryBonus(a.title, query);
@@ -372,8 +372,8 @@ function bestTokenMatch(candidates: Candidate[], query: string): Candidate | nul
   const best = candidates[0]!;
   const queryTokens = tokenizeQuery(query);
   if (queryTokens.length === 0) return best;
-  const bestLower = best.title.toLowerCase();
-  if (queryTokens.some((t) => bestLower.includes(t))) return best;
+  const bestText = `${best.title} ${best.summary.description || ''}`.toLowerCase();
+  if (queryTokens.some((t) => bestText.includes(t))) return best;
   return null;
 }
 
@@ -431,6 +431,7 @@ function collectFromBatch(map: Map<string, BatchPage>, query: string): Candidate
 
 async function resolveFromTitle(
   title: string,
+  query?: string,
 ): Promise<{ summary: PageSummary; categories: string[] }> {
   const batchMap = await batchFetchPages([title]);
   const page = batchMap.get(title);
@@ -438,7 +439,12 @@ async function resolveFromTitle(
     const c = batchToCandidate(page);
     if (c) return { summary: c.summary, categories: c.categories };
   }
-  return fetchPageData(title);
+  const data = await fetchPageData(title);
+  if (data.summary.type === 'disambiguation') {
+    const resolved = await resolveDisambiguation(query || title, data.summary);
+    if (resolved) return resolved;
+  }
+  return data;
 }
 
 export async function resolveEntity(query: string): Promise<{
@@ -470,7 +476,13 @@ export async function resolveEntity(query: string): Promise<{
     if (genMap.size > 0) {
       const candidates = collectFromBatch(genMap, query);
       const best = bestTokenMatch(candidates, query);
-      if (best) result = { summary: best.summary, categories: best.categories };
+      if (best) {
+        const tokens = tokenizeQuery(query);
+        const text = `${best.title} ${best.summary.description || ''}`.toLowerCase();
+        const matches = tokens.filter((t) => text.includes(t)).length;
+        const weak = tokens.length >= 3 && matches <= 1;
+        if (!weak) result = { summary: best.summary, categories: best.categories };
+      }
     }
   }
 
@@ -486,13 +498,13 @@ export async function resolveEntity(query: string): Promise<{
           if (c) result = { summary: c.summary, categories: c.categories };
         }
       }
-      if (!result) result = await resolveFromTitle(datamuse);
+      if (!result) result = await resolveFromTitle(datamuse, query);
     }
   }
 
   if (!result) {
     const fullText = await searchWikiFullText(query);
-    if (fullText) result = await resolveFromTitle(fullText);
+    if (fullText) result = await resolveFromTitle(fullText, query);
   }
 
   if (result) {
