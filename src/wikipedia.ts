@@ -306,7 +306,20 @@ export async function resolveEntity(query: string): Promise<{
   }
 
   if (candidates.length > 0) {
+    const queryTokens = tokenizeQuery(query);
+
     candidates.sort((a, b) => {
+      const aLower = a.title.toLowerCase();
+      const bLower = b.title.toLowerCase();
+
+      let aTokenMatches = 0;
+      let bTokenMatches = 0;
+      for (const token of queryTokens) {
+        if (aLower.includes(token)) aTokenMatches++;
+        if (bLower.includes(token)) bTokenMatches++;
+      }
+      if (aTokenMatches !== bTokenMatches) return bTokenMatches - aTokenMatches;
+
       const bonusA = primaryBonus(a.title, query);
       const bonusB = primaryBonus(b.title, query);
       if (bonusA !== bonusB) return bonusB - bonusA;
@@ -317,6 +330,7 @@ export async function resolveEntity(query: string): Promise<{
 
       return 0;
     });
+
     return { summary: candidates[0]!.summary, categories: candidates[0]!.categories };
   }
 
