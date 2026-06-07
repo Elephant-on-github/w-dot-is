@@ -17,37 +17,39 @@ async function main() {
     return;
   }
 
-  const [darkBg, { summary, categories }] = await Promise.all([
-    detectDarkBg(),
-    withSpinner('Querying Wikipedia...', () => resolveEntity(args.name)),
-  ]);
+  const darkBg = await detectDarkBg();
 
-  const info = extractInfo(summary, categories);
+  const { summary, bioInfo, asciiArt, asciiWidth } = await withSpinner('Loading...', async () => {
+    const { summary, categories } = await resolveEntity(args.name);
+    const bioInfo = extractInfo(summary, categories);
 
-  const { width, height } = {
-    width: process.stdout.columns || 80,
-    height: process.stdout.rows || 24,
-  };
-  const dims = getAsciiDimensions(width, height);
+    const { width, height } = {
+      width: process.stdout.columns || 80,
+      height: process.stdout.rows || 24,
+    };
+    const dims = getAsciiDimensions(width, height);
 
-  let asciiArt = '';
-  if (info.imageUrl) {
-    try {
-      if (args.ascii) {
-        asciiArt = await imageToAsciiSymbolic(info.imageUrl, dims.chars, dims.lines, darkBg);
-      } else {
-        asciiArt = await imageToAscii(info.imageUrl, dims.chars, dims.lines, darkBg);
+    let asciiArt = '';
+    if (bioInfo.imageUrl) {
+      try {
+        if (args.ascii) {
+          asciiArt = await imageToAsciiSymbolic(bioInfo.imageUrl, dims.chars, dims.lines, darkBg);
+        } else {
+          asciiArt = await imageToAscii(bioInfo.imageUrl, dims.chars, dims.lines, darkBg);
+        }
+      } catch {
+        asciiArt = `[image not available for ${summary.title}]`;
       }
-    } catch {
-      asciiArt = `[image not available for ${summary.title}]`;
+    } else {
+      asciiArt = `[no image available for ${summary.title}]`;
     }
-  } else {
-    asciiArt = `[no image available for ${summary.title}]`;
-  }
 
-  renderDisplay(summary.title, asciiArt, dims.chars, {
-    category: info.category,
-    bioLines: info.bioLines,
+    return { summary, bioInfo, asciiArt, asciiWidth: dims.chars };
+  });
+
+  renderDisplay(summary.title, asciiArt, asciiWidth, {
+    category: bioInfo.category,
+    bioLines: bioInfo.bioLines,
   });
 }
 
