@@ -144,12 +144,28 @@ function tokenizeQuery(query: string): string[] {
     .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
 }
 
-function scoreEntry(title: string, description: string, tokens: string[]): number {
+function primaryBonus(title: string, query: string): number {
+  const lower = title.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+
+  let bonus = 0;
+
+  if (lower === lowerQuery) bonus += 20;
+  else if (lower.startsWith(`${lowerQuery} `) || lower.startsWith(`${lowerQuery} (`)) bonus += 10;
+
+  const parenIndex = lower.lastIndexOf('(');
+  if (parenIndex === -1) bonus += 5;
+
+  return bonus;
+}
+
+function scoreEntry(title: string, description: string, tokens: string[], query: string): number {
   const lowerTitle = title.toLowerCase();
   const lowerDesc = description.toLowerCase();
   const combined = `${lowerTitle} ${lowerDesc}`;
 
-  let score = 0;
+  let score = primaryBonus(title, query);
+
   for (const token of tokens) {
     const regex = new RegExp(`\\b${token}\\w*\\b`, 'gi');
     const matches = combined.match(regex);
@@ -209,7 +225,7 @@ export async function resolveDisambiguation(
   let bestScore = 0;
 
   for (const entry of entries) {
-    const score = scoreEntry(entry.title, entry.description, tokens);
+    const score = scoreEntry(entry.title, entry.description, tokens, query);
     if (score > bestScore) {
       bestScore = score;
       bestEntry = entry;
@@ -273,6 +289,8 @@ export async function resolveEntity(query: string): Promise<{
     throw new Error(`no Wikipedia article found for "${query}"`);
   }
 
+  const candidates: { title: string; summary: PageSummary; categories: string[] }[] = [];
+
   for (const title of titles) {
     const summary = await getPageSummary(title);
 
@@ -280,11 +298,26 @@ export async function resolveEntity(query: string): Promise<{
       const categories = await getPageCategories(title);
       const fullExtract = await getPageExtract(title);
       if (fullExtract) summary.fullExtract = fullExtract;
-      return { summary, categories };
+      candidates.push({ title, summary, categories });
+    } else {
+      const resolved = await resolveDisambiguation(query, summary);
+      if (resolved) candidates.push({ title: resolved.summary.title, ...resolved });
     }
+  }
 
-    const resolved = await resolveDisambiguation(query, summary);
-    if (resolved) return resolved;
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => {
+      const bonusA = primaryBonus(a.title, query);
+      const bonusB = primaryBonus(b.title, query);
+      if (bonusA !== bonusB) return bonusB - bonusA;
+
+      const aHasParen = a.title.includes('(');
+      const bHasParen = b.title.includes('(');
+      if (aHasParen !== bHasParen) return aHasParen ? 1 : -1;
+
+      return 0;
+    });
+    return { summary: candidates[0]!.summary, categories: candidates[0]!.categories };
   }
 
   const firstSummary = await getPageSummary(titles[0]!);
