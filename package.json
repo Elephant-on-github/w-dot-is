@@ -1,6 +1,6 @@
 {
   "name": "@elephant_dev/w.is",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Wikipedia lookup CLI — displays color ASCII art and bios of people, places, living things, and things",
   "type": "module",
   "bin": {
