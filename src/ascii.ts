@@ -8,7 +8,8 @@ function luminance(r: number, g: number, b: number): number {
 
 function colorSeq(fg: [number, number, number], bg?: [number, number, number]): string {
   const fgSeq = `\x1b[38;2;${fg[0]};${fg[1]};${fg[2]}m`;
-  return bg ? `${fgSeq}\x1b[48;2;${bg[0]};${bg[1]};${bg[2]}m` : fgSeq;
+  if (bg) return `${fgSeq}\x1b[48;2;${bg[0]};${bg[1]};${bg[2]}m`;
+  return `${fgSeq}\x1b[49m`;
 }
 
 function fmtKey(c: [number, number, number] | null): string {
