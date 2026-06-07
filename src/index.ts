@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { getAsciiDimensions, imageToAscii, imageToAsciiSymbolic } from './ascii';
+import { getAsciiDimensions, imageToAscii, imageToAsciiBg, imageToAsciiSymbolic } from './ascii';
 import { extractInfo } from './bio';
 import { CliError, CliHelp, parseArgs, printHelp } from './cli';
 import { renderDisplay, renderVerify } from './renderer';
@@ -32,7 +32,9 @@ async function main() {
     let asciiArt = '';
     if (bioInfo.imageUrl) {
       try {
-        if (args.ascii) {
+        if (args.bg) {
+          asciiArt = await imageToAsciiBg(bioInfo.imageUrl, dims.chars, dims.lines, darkBg);
+        } else if (args.ascii) {
           asciiArt = await imageToAsciiSymbolic(bioInfo.imageUrl, dims.chars, dims.lines, darkBg);
         } else {
           asciiArt = await imageToAscii(bioInfo.imageUrl, dims.chars, dims.lines, darkBg);

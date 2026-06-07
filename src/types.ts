@@ -5,6 +5,7 @@ export interface ParsedArgs {
   predicate?: string;
   mode: 'display' | 'verify';
   ascii?: boolean;
+  bg?: boolean;
 }
 
 export interface PageSummary {

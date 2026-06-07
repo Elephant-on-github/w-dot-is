@@ -3,7 +3,8 @@ import type { ParsedArgs } from './types';
 export function parseArgs(raw: string[]): ParsedArgs {
   const helpFlags = ['--help', '-h'];
   const ascii = raw.includes('--ascii');
-  const args = raw.filter((a) => a !== '--ascii');
+  const bg = raw.includes('--bg');
+  const args = raw.filter((a) => a !== '--ascii' && a !== '--bg');
 
   if (args.length === 0 || args.some((a) => helpFlags.includes(a))) {
     throw new CliHelp();
@@ -25,7 +26,7 @@ export function parseArgs(raw: string[]): ParsedArgs {
     throw new CliError('--is and --a must be used together');
   }
 
-  return { name: args[0]!, mode: 'display', ascii };
+  return { name: args[0]!, mode: 'display', ascii, bg };
 }
 
 export function printHelp(): void {
@@ -35,6 +36,7 @@ w.is \u2014 who, what or where is x
 usage:
   w.is <name>                    display info about <name>
   w.is --ascii <name>            display with traditional ASCII art
+  w.is --bg <name>               display with background-color spaces
   w.is --is <name> --a <desc>    check if "<name> is a <desc>"
   w.is --help                    show this help
 
@@ -43,6 +45,7 @@ usage:
 examples:
   w.is banana
   w.is --ascii banana
+  w.is --bg banana
   w.is "wooden handheld board for paint mixing"
   w.is --is banana --a fruit
 `);
